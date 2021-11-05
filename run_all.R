@@ -11,14 +11,25 @@
 # See the License for the specific language governing permissions and limitations under the License.
 
 source('header.R')
+source('packages.R')
 
+#Load general layers
 source("01_load.R")
 
+#Load BEC current and projected
+source("01_load_BEC.R")
+
+#Load Velocity from U of A
+source("01_load_Velocity.R")
+
 #Clips input too AOI - current options include:
-AOI <- ws %>%
-  filter(SUB_SUB_DRAINAGE_AREA_NAME == "Bulkley")
-#AOI <- BCr
+#AOI <- ws %>%
+#  filter(SUB_SUB_DRAINAGE_AREA_NAME == "Bulkley")
+AOI <- BC
 #AOI <- ESI
+AOI <- EcoRegions %>%
+ filter(ECOREGION_NAME == "EASTERN HAZELTON MOUNTAINS")
+#NASS RANGES, COASTAL GAP
 
 #resolution of analysis -
 #pixSize<-10 #in hectares - changes resolution of grids but will maintain OmniRadius

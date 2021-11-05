@@ -10,217 +10,184 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
-#Compare BEC from 1970 to 2080 - Zone, Sub-Zone and Variant
+#Compare BEC from 2021 to 2050 - Full Label, Zone and Sub-Zone (Variant inconsistent label on 2050 BEC)
 
 ### Zone
-#Compare Zone from 1970 to 2080
+#Compare Zone from 2021 to 2050
 #Change rasters to be of Zone instead of default Variant
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,ZONEn)
-BEC1970z<- raster::subs(BEC1970, subsBEC)
-writeRaster(BEC1970z, filename=file.path(spatialOutDir,paste("BEC1970z",sep="")), format="GTiff",overwrite=TRUE)
+subsBEC<-BEC_LUT[!(is.na(BEC_LUT$BEC_id)),] %>%
+  dplyr::select(BEC_id, ZoneN)
+BEC2021z<- raster::subs(BEC2021r, subsBEC, by='BEC_id', which='ZoneN')
+writeRaster(BEC2021z, filename=file.path(spatialOutDir,paste("BEC2021z",sep="")), format="GTiff",overwrite=TRUE)
 
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,ZONEn)
-BEC2080z<- raster::subs(BEC2080, subsBEC)
-writeRaster(BEC2080z, filename=file.path(spatialOutDir,paste("BEC2080z",sep="")), format="GTiff",overwrite=TRUE)
+BEC2021z<-raster(file.path(spatialOutDir,("BEC2021z.tif")))
+
+BEC2050z<- raster::subs(BEC2050r, subsBEC, by='BEC_id', which='ZoneN')
+writeRaster(BEC2050z, filename=file.path(spatialOutDir,paste("BEC2050z",sep="")), format="GTiff",overwrite=TRUE)
+#BEC2050z2<- raster::subs(BEC2050r, subsBEC, by='BEC_id', which='ZoneN',subsWithNA=TRUE)
+#writeRaster(BEC2050z2, filename=file.path(spatialOutDir,paste("BEC2050z2",sep="")), format="GTiff",overwrite=TRUE)
+
+BEC2050z<-raster(file.path(spatialOutDir,("BEC2050z.tif")))
 
 #Crosstab to see extent of overlap
 #create LUT for each year
-BEC1970z_LUT<-BEC1970z %>%
+BEC2021z_LUT<-BEC2021z %>%
   unique() %>%
   data.frame() %>%
-  dplyr::rename(ZONEn ='.') %>%
+  dplyr::rename(ZoneN = '.') %>%
   left_join(BEC_LUT) %>%
-  group_by(ZONEn.1=ZONEn) %>%
+  group_by(ZoneN.1=ZoneN) %>%
   dplyr::summarise(ZONE=first(ZONE)) %>%
-  rbind(data.frame(ZONEn.1=NA, ZONE=NA))
+  rbind(data.frame(ZoneN.1=NA, ZONE=NA))
 
-BEC2080z_LUT<-BEC2080z %>%
+BEC2050z_LUT<-BEC2050z %>%
   unique() %>%
   data.frame() %>%
-  dplyr::rename(ZONEn ='.') %>%
+  dplyr::rename(ZoneN ='.') %>%
   left_join(BEC_LUT) %>%
-  group_by(ZONEn.2=ZONEn) %>%
+  group_by(ZoneN.2=ZoneN) %>%
   dplyr::summarise(ZONE=first(ZONE)) %>%
-  rbind(data.frame(ZONEn.2=NA, ZONE=NA))
+  rbind(data.frame(ZoneN.2=NA, ZONE=NA))
 
 #need to add NA case since many non-analogue between years
-BEC1970_2080z<-raster::crosstab(BEC1970z, BEC2080z, long=TRUE, useNA=FALSE) %>%
-  left_join(BEC1970z_LUT) %>%
-  dplyr::rename(BEC1970=ZONE) %>%
-  left_join(BEC2080z_LUT) %>%
-  dplyr::rename(BEC2080=ZONE) %>%
-  dplyr::select(BEC1970n=ZONEn.1, BEC1970, BEC2080n=ZONEn.2, BEC2080, Freq)
+BEC2021_2050z1<-raster::crosstab(BEC2021z, BEC2050z, long=TRUE, useNA=FALSE)
+#BEC2021_2050z1wNA-raster::crosstab(BEC2021z, BEC2050z, long=TRUE, useNA=TRUE)
+
+  BEC2021_2050z <- BEC2021_2050z1 %>%
+  dplyr::rename(ZoneN.1=BEC2021z) %>%
+  left_join(BEC2021z_LUT) %>%
+  dplyr::rename(BEC2021=ZONE) %>%
+  dplyr::rename(ZoneN.2=BEC2050z) %>%
+  left_join(BEC2050z_LUT) %>%
+  dplyr::rename(BEC2050=ZONE) %>%
+  dplyr::select(BEC2021, BEC2021n=ZoneN.1, BEC2050, BEC2050n=ZoneN.2, Freq)
 
 #Find which and the number of overlaps between years
-macroRefugiaZ <- BEC1970_2080z %>%
-  dplyr::filter_(~as.character(BEC1970) == as.character(BEC2080))
-#Calculate % of overlap between 1970 and 2080
-sum(macroRefugiaZ$Freq)/sum(BEC1970_2080z$Freq[!is.na(BEC1970_2080z$BEC1970n)])*100
-
-
-
+macroRefugiaZ <- BEC2021_2050z %>%
+  dplyr::filter_(~as.character(BEC2021) == as.character(BEC2050))
+#Calculate % of overlap between 2021 and 2050
+sum(macroRefugiaZ$Freq)/sum(BEC2021_2050z$Freq[!is.na(BEC2021_2050z$BEC2021n)])*100
+WriteXLS(macroRefugiaZ,file.path(dataOutDir,'macroRefugiaZ.xlsx'))
 
 
 ### Sub-Zone
-#Compare Sub=Zone from 1970 to 2080
-#Change rasters to be of Sub-Zone
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,SUBZn)
-BEC1970sz<- raster::subs(BEC1970, subsBEC)
-writeRaster(BEC1970sz, filename=file.path(spatialOutDir,paste("BEC1970sz",sep="")), format="GTiff",overwrite=TRUE)
+#Compare sub Zone from 2021 to 2050
+#Change rasters to be of Zone instead of default Variant
+subsBEC<-BEC_LUT[!(is.na(BEC_LUT$BEC_id)),] %>%
+  dplyr::select(BEC_id, SubZoneN)
+BEC2021sz<- raster::subs(BEC2021r, subsBEC, by='BEC_id', which='SubZoneN')
+writeRaster(BEC2021sz, filename=file.path(spatialOutDir,paste("BEC2021z",sep="")), format="GTiff",overwrite=TRUE)
+#BEC2021sz<-raster(file.path(spatialOutDir,("BEC2021sz.tif")))
 
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,SUBZn)
-BEC2080sz<- raster::subs(BEC2080, subsBEC)
-writeRaster(BEC2080sz, filename=file.path(spatialOutDir,paste("BEC2080sz",sep="")), format="GTiff",overwrite=TRUE)
-
-#Crosstab to see extent of overlap
-#create LUT for each year
-BEC1970sz_LUT<-BEC1970sz %>%
-  unique() %>%
-  data.frame() %>%
-  dplyr::rename(SUBZn ='.') %>%
-  left_join(BEC_LUT) %>%
-  group_by(SUBZn.1=SUBZn) %>%
-  dplyr::summarise(SUBZ=first(SUBZ)) %>%
-  rbind(data.frame(SUBZn.1=NA, SUBZ=NA))
-
-BEC2080sz_LUT<-BEC2080sz %>%
-  unique() %>%
-  data.frame() %>%
-  dplyr::rename(SUBZn ='.') %>%
-  left_join(BEC_LUT) %>%
-  group_by(SUBZn.2=SUBZn) %>%
-  dplyr::summarise(SUBZ=first(SUBZ)) %>%
-  rbind(data.frame(SUBZn.2=NA, SUBZ=NA))
-
-#need to add NA case since many non-analogue between years
-BEC1970_2080sz<-raster::crosstab(BEC1970sz, BEC2080sz, long=TRUE, useNA=FALSE) %>%
-  left_join(BEC1970sz_LUT) %>%
-  dplyr::rename(BEC1970=SUBZ) %>%
-  left_join(BEC2080sz_LUT) %>%
-  dplyr::rename(BEC2080=SUBZ) %>%
-  dplyr::select(BEC1970n=SUBZn.1, BEC1970, BEC2080n=SUBZn.2, BEC2080, Freq)
-
-sum(BEC1970_2080sz$Freq)
-
-#Find which and the number of overlaps between years
-macroRefugiaSZ <- BEC1970_2080sz %>%
-  dplyr::filter_(~as.character(BEC1970) == as.character(BEC2080))
-#Calculate % of overlap between 1970 and 2080
-sum(macroRefugiaSZ$Freq)/sum(BEC1970_2080sz$Freq)*100
-
-### Variant
-#Compare Variant from 1970 to 2080
-#Change rasters to be of Variant
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,VARn)
-BEC1970v<- raster::subs(BEC1970, subsBEC)
-writeRaster(BEC1970v, filename=file.path(spatialOutDir,paste("BEC1970v",sep="")), format="GTiff",overwrite=TRUE)
-
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,VARn)
-BEC2080v<- raster::subs(BEC2080, subsBEC)
-writeRaster(BEC2080v, filename=file.path(spatialOutDir,paste("BEC2080v",sep="")), format="GTiff",overwrite=TRUE)
+BEC2050sz<- raster::subs(BEC2050r, subsBEC, by='BEC_id', which='SubZoneN')
+writeRaster(BEC2050sz, filename=file.path(spatialOutDir,paste("BEC2050sz",sep="")), format="GTiff",overwrite=TRUE)
+#BEC2050z2<- raster::subs(BEC2050r, subsBEC, by='BEC_id', which='ZoneN',subsWithNA=TRUE)
+#writeRaster(BEC2050z2, filename=file.path(spatialOutDir,paste("BEC2050z2",sep="")), format="GTiff",overwrite=TRUE)
+#BEC2050z<-raster(file.path(spatialOutDir,("BEC2050z.tif")))
 
 #Crosstab to see extent of overlap
 #create LUT for each year
-BEC1970v_LUT<-BEC1970v %>%
+BEC2021sz_LUT<-BEC2021sz %>%
   unique() %>%
   data.frame() %>%
-  dplyr::rename(VARn ='.') %>%
+  dplyr::rename(SubZoneN = '.') %>%
   left_join(BEC_LUT) %>%
-  group_by(VARn.1=VARn) %>%
-  dplyr::summarise(VAR=first(VAR)) %>%
-  rbind(data.frame(VARn.1=NA, VAR=NA))
+  group_by(SubZoneN.1=SubZoneN) %>%
+  dplyr::summarise(SubZone=first(SubZone)) %>%
+  rbind(data.frame(SubZoneN.1=NA, SubZone=NA))
 
-BEC2080v_LUT<-BEC2080v %>%
+BEC2050sz_LUT<-BEC2050sz %>%
   unique() %>%
   data.frame() %>%
-  dplyr::rename(VARn ='.') %>%
+  dplyr::rename(SubZoneN ='.') %>%
   left_join(BEC_LUT) %>%
-  group_by(VARn.2=VARn) %>%
-  dplyr::summarise(VAR=first(VAR)) %>%
-  rbind(data.frame(VARn.2=NA, VAR=NA))
+  group_by(SubZoneN.2=SubZoneN) %>%
+  dplyr::summarise(SubZone=first(SubZone)) %>%
+  rbind(data.frame(SubZoneN.2=NA, SubZone=NA))
 
 #need to add NA case since many non-analogue between years
-BEC1970_2080v<-raster::crosstab(BEC1970v, BEC2080v, long=TRUE, useNA=FALSE) %>%
-  left_join(BEC1970v_LUT) %>%
-  dplyr::rename(BEC1970=VAR) %>%
-  left_join(BEC2080v_LUT) %>%
-  dplyr::rename(BEC2080=VAR) %>%
-  dplyr::select(BEC1970n=VARn.1, BEC1970, BEC2080n=VARn.2, BEC2080, Freq)
+BEC2021_2050sz1<-raster::crosstab(BEC2021sz, BEC2050sz, long=TRUE, useNA=FALSE)
+#BEC2021_2050z1wNA-raster::crosstab(BEC2021z, BEC2050z, long=TRUE, useNA=TRUE)
 
-sum(BEC1970_2080v$Freq)
+BEC2021_2050sz <- BEC2021_2050sz1 %>%
+  dplyr::rename(BEC2050sz=SubZoneN) %>%
+  dplyr::rename(SubZoneN.1=BEC2021sz) %>%
+  left_join(BEC2021sz_LUT) %>%
+  dplyr::rename(BEC2021=SubZone) %>%
+  dplyr::rename(SubZoneN.2=BEC2050sz) %>%
+  left_join(BEC2050sz_LUT) %>%
+  dplyr::rename(BEC2050=SubZone) %>%
+  dplyr::select(BEC2021, BEC2021n=SubZoneN.1, BEC2050, BEC2050n=SubZoneN.2, Freq)
 
 #Find which and the number of overlaps between years
-macroRefugiaV <- BEC1970_2080v %>%
-  dplyr::filter_(~as.character(BEC1970) == as.character(BEC2080))
-#Calculate % of overlap between 1970 and 2080
-sum(macroRefugiaV$Freq)/sum(BEC1970_2080v$Freq)*100
+macroRefugiaSZ <- BEC2021_2050sz %>%
+  dplyr::filter_(~as.character(BEC2021) == as.character(BEC2050))
+#Calculate % of overlap between 2021 and 2050
+sum(macroRefugiaSZ$Freq)/sum(BEC2021_2050sz$Freq[!is.na(BEC2021_2050sz$BEC2021n)])*100
+WriteXLS(macroRefugiaSZ,file.path(dataOutDir,'macroRefugiaSZ.xlsx'))
 
-### Group
-#Compare BEC groups from 1970 to 2080
-#Change rasters to be of Groups
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,Groupn)
-BEC1970g<- raster::subs(BEC1970, subsBEC)
-writeRaster(BEC1970g, filename=file.path(spatialOutDir,paste("BEC1970g",sep="")), format="GTiff",overwrite=TRUE)
+### BGC
+#Compare BGC from 2021 to 2050
+#subsBEC<-BEC_LUT[!(is.na(BEC_LUT$BEC_id)),] %>%
+#  dplyr::select(BEC_id, BEC_id)
+BEC2021bgc<- BEC2021r
+#writeRaster(BEC2021bgc, filename=file.path(spatialOutDir,paste("BEC2021bgc",sep="")), format="GTiff",overwrite=TRUE)
 
-subsBEC<-BEC_LUT[!(is.na(BEC_LUT$ID)),] %>%
-  dplyr::select(ID,Groupn)
-BEC2080g<- raster::subs(BEC2080, subsBEC)
-writeRaster(BEC2080g, filename=file.path(spatialOutDir,paste("BEC2080g",sep="")), format="GTiff",overwrite=TRUE)
+BEC2050bgc<- BEC2050r
+#writeRaster(BEC2050bgc, filename=file.path(spatialOutDir,paste("BEC2050bgc",sep="")), format="GTiff",overwrite=TRUE)
 
 #Crosstab to see extent of overlap
 #create LUT for each year
-BEC1970g_LUT<-BEC1970g %>%
+BEC2021bgc_LUT<-BEC2021r %>%
   unique() %>%
   data.frame() %>%
-  dplyr::rename(Groupn ='.') %>%
+  dplyr::rename(bgcN ='.') %>%
   left_join(BEC_LUT) %>%
-  group_by(Groupn.1=Groupn) %>%
-  dplyr::summarise(BECgroup=first(BECgroup)) %>%
-  rbind(data.frame(Groupn.1=NA, BECgroup=NA))
+  group_by(BEC_id) %>%
+  dplyr::summarise(BGC=first(BGC)) %>%
+  dplyr::rename(bgcN.1=BEC_id) %>%
+  rbind(data.frame(bgcN.1=NA, BGC=NA))
 
-BEC2080g_LUT<-BEC2080g %>%
+BEC2050bgc_LUT<-BEC2050r %>%
   unique() %>%
   data.frame() %>%
-  dplyr::rename(Groupn ='.') %>%
+  dplyr::rename(bgcN ='.') %>%
   left_join(BEC_LUT) %>%
-  group_by(Groupn.2=Groupn) %>%
-  dplyr::summarise(BECgroup=first(BECgroup)) %>%
-  rbind(data.frame(Groupn.2=NA, BECgroup=NA))
+  group_by(BEC_id) %>%
+  dplyr::summarise(BGC=first(BGC)) %>%
+  dplyr::rename(bgcN.2=BEC_id) %>%
+  rbind(data.frame(bgcN.2=NA, BGC=NA))
 
 #need to add NA case since many non-analogue between years
-BEC1970_2080g<-raster::crosstab(BEC1970g, BEC2080g, long=TRUE, useNA=FALSE) %>%
-  left_join(BEC1970g_LUT) %>%
-  dplyr::rename(BEC1970=BECgroup) %>%
-  left_join(BEC2080g_LUT) %>%
-  dplyr::rename(BEC2080=BECgroup) %>%
-  dplyr::select(BEC1970n=Groupn.1, BEC1970, BEC2080n=Groupn.2, BEC2080, Freq)
+BEC2021_2050bgc1<-raster::crosstab(BEC2021bgc, BEC2050bgc, long=TRUE, useNA=FALSE)
 
-sum(BEC1970_2080g$Freq)
+BEC2021_2050bgc <- BEC2021_2050bgc1 %>%
+  dplyr::rename(bgcN.1=BEC2021r) %>%
+  dplyr::rename(bgcN.2=BEC2050r) %>%
+  left_join(BEC2021bgc_LUT) %>%
+  dplyr::rename(BEC2021=BGC) %>%
+  left_join(BEC2050bgc_LUT) %>%
+  dplyr::rename(BEC2050=BGC) %>%
+  dplyr::select(BEC2021n=bgcN.1, BEC2021, BEC2050n=bgcN.2, BEC2050, Freq)
 
 #Find which and the number of overlaps between years
-macroRefugiaG <- BEC1970_2080g %>%
-  dplyr::filter_(~as.character(BEC1970) == as.character(BEC2080))
-#Calculate % of overlap between 1970 and 2080
-sum(macroRefugiaG$Freq)/sum(BEC1970_2080g$Freq)*100
+macroRefugiabgc <- BEC2021_2050bgc %>%
+  dplyr::filter_(~as.character(BEC2021) == as.character(BEC2050))
+#Calculate % of overlap between 2021 and 2050
+sum(macroRefugiabgc$Freq)/sum(BEC2021_2050bgc$Freq[!is.na(BEC2021_2050bgc$BEC2021n)])*100
+
+WriteXLS(macroRefugiabgc,file.path(dataOutDir,'macroRefugiabgc.xlsx'))
 
 #Output data as a multi-tabbed spreadsheet
-XtabSummary<- data.frame(c('Zone','SubZone','Variant','Group'),
-                         c(sum(macroRefugiaZ$Freq)/sum(BEC1970_2080z$Freq)*100,
-                           sum(macroRefugiaSZ$Freq)/sum(BEC1970_2080sz$Freq)*100,
-                           sum(macroRefugiaV$Freq)/sum(BEC1970_2080v$Freq)*100,
-                           sum(macroRefugiaG$Freq)/sum(BEC1970_2080g$Freq)*100))
+XtabSummary<- data.frame(c('Zone','SubZone','Variant'),
+                         c(sum(macroRefugiaZ$Freq)/sum(BEC2021_2050z$Freq)*100,
+                           sum(macroRefugiaSZ$Freq)/sum(BEC2021_2050sz$Freq)*100,
+                           sum(macroRefugiabgc$Freq)/sum(BEC2021_2050bgc$Freq)*100))
 colnames(XtabSummary)<-c('BECscale','pcOverlap')
 
 #Write out results into a multi-tab spreadsheet
-BECxData<-list(XtabSummary, BEC1970_2080g,macroRefugiaG,  BEC1970_2080v,macroRefugiaV, BEC1970_2080sz,macroRefugiaSZ, BEC1970_2080z,macroRefugiaZ)
-BECDataNames<-c('XtabSummary','GroupXtab','GroupOverlap','VariantXtab','VariantOverlap','SubZoneXtab','SubZoneOverlap','ZoneXtab','ZoneOverlap')
+BECxData<-list(XtabSummary, BEC2021_2050bgc,macroRefugiabgc, BEC2021_2050sz,macroRefugiaSZ, BEC2021_2050z,macroRefugiaZ)
+BECDataNames<-c('XtabSummary','VariantXtab','VariantOverlap','SubZoneXtab','SubZoneOverlap','ZoneXtab','ZoneOverlap')
 
 WriteXLS(BECxData,file.path(dataOutDir,paste('BECxData.xlsx',sep='')),SheetNames=BECDataNames)
 

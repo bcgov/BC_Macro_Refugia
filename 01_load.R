@@ -10,21 +10,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
-source("header.R")
-
-bc <- bcmaps::bc_bound()
-Prov_crs<-crs(bc)
+Prov_crs<-crs(bcmaps::bc_bound())
 #Prov_crs<-"+proj=aea +lat_1=50 +lat_2=58.5 +lat_0=45 +lon_0=-126 +x_0=1000000 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 #Provincial Raster to place rasters in the same reference
-
 BCr_file <- file.path(spatialOutDir,"BCr.tif")
 if (!file.exists(BCr_file)) {
   ProvRast<-raster(nrows=15744, ncols=17216, xmn=159587.5, xmx=1881187.5,
                    ymn=173787.5, ymx=1748187.5,
                    crs=Prov_crs,
                    res = c(100,100), vals = 1)
-BCr <- fasterize(bcmaps::bc_bound_hres(class='sf'),ProvRast)
+  BC<-bcmaps::bc_bound_hres(class='sf')
+  saveRDS(BC,file='tmp/BC')
+  BCr <- fasterize(BC,ProvRast)
   writeRaster(BCr, filename=BCr_file, format="GTiff", overwrite=TRUE)
   BCr_S <-st_as_stars(BCr)
   write_stars(BCr_S,dsn=file.path(spatialOutDir,'BCr_S.tif'))
@@ -32,20 +30,9 @@ BCr <- fasterize(bcmaps::bc_bound_hres(class='sf'),ProvRast)
 } else {
   BCr_S <- read_stars(file.path(spatialOutDir,'BCr_S.tif'))
   BCr <- raster(BCr_file)
+  BC <-readRDS('tmp/BC')
   ProvRast<-raster(file.path(spatialOutDir,'ProvRast.tif'))
 }
-
-#ESI boundary - for testing, etc.
-ESI_file <- file.path("tmp/ESI")
-if (!file.exists(ESI_file)) {
-  #Load ESI boundary
-  ESIin <- read_sf(file.path(ESIDir,'Data/Skeena_ESI_Boundary'), layer = "ESI_Skeena_Study_Area_Nov2017") %>%
-    st_transform(3005)
-  ESI <- st_cast(ESIin, "MULTIPOLYGON")
-  saveRDS(ESI, file = ESI_file)
-} else
-  ESI<-readRDS(file = ESI_file)
-
 
 #Ecosections
 EcoS_file <- file.path("tmp/EcoS")
@@ -54,140 +41,7 @@ ESin <- read_sf(file.path(SpatialDir,'Ecosections/Ecosections.shp')) %>%
 EcoS <- st_cast(ESin, "MULTIPOLYGON")
 saveRDS(EcoS, file = EcoS_file)
 
-#SkeenaSalmonStudyBoundary
-SalmS_file <- file.path("tmp/SalmS")
-SalmSin <- read_sf(file.path(SpatialDir,'SkeenaSalmonStudyBd/SkeenaSalmonStudyBd.shp')) %>%
-  st_transform(3005)
-SalmS <- st_cast(SalmSin, "MULTIPOLYGON")
-saveRDS(SalmS, file = SalmS_file)
+#EcoRegions
+EcoRegions<-bcmaps::ecoregions()
 
-ws <- get_layer("wsc_drainages", class = "sf") %>%
-  dplyr::select(SUB_DRAINAGE_AREA_NAME, SUB_SUB_DRAINAGE_AREA_NAME) %>%
-  dplyr::filter(SUB_DRAINAGE_AREA_NAME %in% c("Nechako", "Skeena - Coast"))
-st_crs(ws)<-3005
-saveRDS(ws, file = "tmp/ws")
-write_sf(ws, file.path(spatialOutDir,"ws.gpkg"))
-
-
-
-#Read in Wetzinkwa BEC data from Colin
-# He uses ESP 4326 - WGS84 - common for shiny to get boiler plate backgrounds
-# I transform to Albers - could leave in WGS84? but then hard to mix with other layers
-
-#Look at ensamble data first - then look at other scenarios - may need advise on what bookends?
-BEC_2005  <-raster(file.path(WetzinkData, 'BGC.pred.WetzinKwa.2005.tif')) %>%
-  projectRaster(crs=Prov_crs, method='ngb')
-
-BEC_2025  <-raster(file.path(WetzinkData, 'BGC.pred.WetzinKwa.ensemble.rcp45.2025.tif')) %>%
-  projectRaster(crs=Prov_crs, method='ngb')
-
-BEC_2055  <-raster(file.path(WetzinkData, 'BGC.pred.WetzinKwa.ensemble.rcp45.2055.tif')) %>%
-  projectRaster(crs=Prov_crs, method='ngb')
-
-BEC_2085  <-raster(file.path(WetzinkData, 'BGC.pred.WetzinKwa.ensemble.rcp45.2085.tif')) %>%
-  projectRaster(crs=Prov_crs, method='ngb')
-
-bgc.names <- read.csv(file.path(WetzinkData, "All_BGCs_v11_21.csv"), stringsAsFactors = F)
-
-#BGC subzone color scheme
-bgccolors <- read.csv(file.path(WetzinkData, "WNAv11_Subzone_Colours.csv"), stringsAsFactors = F)
-zonecolors <- read.csv(file.path(WetzinkData, "WNAv11_Zone_Colours.csv"), stringsAsFactors = F)
-zonecolors.BC <- read.csv(file.path(WetzinkData, "BGCzone_Colorscheme.csv"), stringsAsFactors = F)
-zonecolors$colour[match(zonecolors.BC$zone, zonecolors$classification)] <- as.character(zonecolors.BC$HEX)
-
-levels.bgc <- read.csv(file.path(WetzinkData, "levels.bgc.csv"), stringsAsFactors = F)
-
-BGC.pred.ref  <-raster(file.path(WetzinkData, 'BGC.pred.WetzinKwa.ref.tif'))
-
-BGC.pred.refT  <-raster(file.path(WetzinkData, 'BGC.pred.WetzinKwa.ref.tif')) %>%
-  projectRaster(crs=Prov_crs, method='ngb')
-
-#Data Check
-#writeRaster(BEC_1, filename=file.path(spatialOutDir,'BEC_1'), format="GTiff", overwrite=TRUE)
-
-#Check as stars
-#BEC_1stars<-st_as_stars(BEC_1)
-
-SimpleBEC <- read_sf(file.path(WetzinkData), layer = "bgc.simple") %>%
-  st_transform(3005) %>%
-  st_cast("MULTIPOLYGON")
-
-#mapview(BEC_1stars)+mapview(BEC_1)+mapview(SimpleBEC)
-
-#Provincial BEC 1970 and 2080
-#Read in rasters and put into Albers projection and resample to 100m and allign with provincial raster
-BEC1970P<-raster(file.path(RefugiaSpatialDir, 'BEC_zone_1970/BEC_zone.tif')) %>% #EPSG=4326 - GCS_WGS_1984
-  projectRaster(crs=Prov_crs, method='ngb') %>%
-  raster::resample(BCr, method='ngb')
-#Check raster for size and values
-#cellStats((BEC1970PinP3>0),sum)
-#unique(BEC1970PinP3)
-#mapview(BEC1970PinP3)
-saveRDS(BEC1970P,file='tmp/BEC1970P')
-#Check raster in Q compare with vector BEC
-writeRaster(BEC1970P, filename=file.path(spatialOutDir,paste("BEC1970P",sep="")), format="GTiff",overwrite=TRUE)
-
-#can also use - BEC1970P_LUTs <- levels(BEC1970Pin)
-BEC1970P_LUT <- read.dbf(file.path(RefugiaSpatialDir, "BEC_zone_1970/BEC_zone.tif.vat.dbf"),as.is=TRUE)
-
-BEC2080P<-raster(file.path(RefugiaSpatialDir, 'BEC_zone_2080s/BEC_zone_2080s.tif')) %>%
-  projectRaster(crs=Prov_crs, method='ngb') %>%
-  raster::resample(BCr, method='ngb')
-
-saveRDS(BEC2080P,file='tmp/BEC2080P')
-#Check raster for size and values
-#cellStats((BEC2080P>0),sum)
-#unique(BEC2080P)
-
-BEC2080P_LUT <- read.dbf(file.path(RefugiaSpatialDir, "BEC_zone_2080s/BEC_zone_2080s.tif.vat.dbf"),as.is=TRUE)
-
-#Make new universal LUT since values different in 2 rasters
-BEC_LUT1<-BEC1970P_LUT %>%
-  full_join(BEC2080P_LUT,by='VAR') %>%
-  mutate(ID = 1:n()) %>%
-  mutate(VARn = ID) %>%
-  transform(SUBZn=as.integer(factor(SUBZ))) %>%
-  transform(ZONEn=as.integer(factor(ZONE.x))) %>%
-  dplyr::select(ID, V1970 = VALUE.x, V2080 = VALUE.y, ZONEn, ZONE=ZONE.x, SUBZn, SUBZ, VARn, VAR)
-
-#Reclass rasters so values are the same for Variants
-subsBEC<-BEC_LUT1[!(is.na(BEC_LUT1$V1970)),] %>%
-  dplyr::select(V1970,ID)
-BEC1970PS <- raster::subs(BEC1970P, subsBEC)
-saveRDS(BEC1970PS,file='tmp/BEC1970PS')
-writeRaster(BEC1970PS, filename=file.path(spatialOutDir,paste("BEC1970PS",sep="")), format="GTiff",overwrite=TRUE, RAT=TRUE)
-
-subsBEC<-BEC_LUT1[!(is.na(BEC_LUT1$V2080)),] %>%
-  dplyr::select(V2080,ID)
-BEC2080PS <- raster::subs(BEC2080P, subsBEC)
-saveRDS(BEC2080PS,file='tmp/BEC2080PS')
-writeRaster(BEC2080PS, filename=file.path(spatialOutDir,paste("BEC2080PS",sep="")), format="GTiff",overwrite=TRUE, RAT=TRUE)
-
-#Read in BEC grouping spredsheet -BECv11_SubzoneVariant_Groups.xlsx
-BECgroupSheets<- excel_sheets(file.path(DataDir,'BECv11_SubzoneVariant_GroupsV2.xlsx'))
-BECgroupSheetsIn<-read_excel(file.path(DataDir,'BECv11_SubzoneVariant_GroupsV2.xlsx'),
-                             sheet = BECgroupSheets[2])
-#Make a data frame for the data
-BECGroup_LUT<-data.frame(VARns=BECgroupSheetsIn$`BEC Unit`,
-                         BECgroup=BECgroupSheetsIn$GROUP, stringsAsFactors = FALSE)
-#Trim whitespace in BEC_LUT bec labels so can match to Group_LUT
-BEC_LUT1$VARns<-gsub(" ", "", BEC_LUT1$VAR, fixed = TRUE)
-#Join to BEC_LUT
-BEC_LUT2<-BEC_LUT1 %>%
-  left_join(BECGroup_LUT)
-#pull out records with NAs and make excel spreadsheet
-BECmissing <- BEC_LUT2[is.na(BEC_LUT2$BECgroup),] %>%
-  dplyr::select(ID,ZONE,SUBZ,VAR,BECgroup)
-WriteXLS(BECmissing,file.path(dataOutDir,paste('BECmissing.xlsx',sep='')))
-
-#Assign NAs groups to ZONEs
-BEC_LUT2$BECgroup[is.na(BEC_LUT2$BECgroup)] <-
-  paste(as.character(BEC_LUT2$ZONE[is.na(BEC_LUT2$BECgroup)]),'_missing',sep='')
-BEC_LUT<-BEC_LUT2 %>%
-  transform(Groupn=as.integer(factor(BECgroup)))
-
-# Download BEC - # Gets bec_sf zone shape and filters the desired subzones
-bec_sf <- bec(class = "sf")# %>%
-#st_intersection(study_area)
-saveRDS(bec_sf, file = "tmp/bec_sf")
 

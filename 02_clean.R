@@ -10,29 +10,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 
+# Add unique zone and subzone numbers
+
+
+
+
+
+
+
+
+
+
+
 #Get levels assigned to the reference layer
-bgc.names.LUT<-data.frame(BGC=levels.bgc[,1]) %>%
-  mutate(id=row_number())
+#bgc.names.LUT<-data.frame(BGC=levels.bgc[,1]) %>%
+#  mutate(id=row_number())
 
 #BGC.pred.refX <- levels.bgc[,1][values(BGC.pred.ref)]
 
-mapview(BGC.pred.ref)
+#################
 
-studyarea<-'Wetzinkwa'
-#levels.bgc <- read.csv("data/levels.bgc.csv")[,1]
-levels.bgc <- read.csv(file.path(WetzinkData,"levels.bgc.csv"))[,1]
-#bgc.pred.ref <- raster(paste("data/BGC.pred", studyarea, "ref.tif", sep="."))
-bgc.pred.ref <- raster(file.path(WetzinkData,paste("BGC.pred", studyarea, "ref.tif", sep=".")))
-X <- bgc.pred.ref
-BGC.pred <- levels.bgc[values(X)]
-
-#Subset data for testing
-ws <- readRDS(file = 'tmp/ws') %>%
-  st_intersection(AOI)
-
-bec_sf <- readRDS(file= 'tmp/bec_sf') %>%
-  st_intersection(AOI)
-saveRDS(bec_sf, file = 'tmp/bec_sf')
 
 BEC1970<-readRDS(file= 'tmp/BEC1970PS') %>%
   mask(AOI) %>%
@@ -45,6 +42,27 @@ BEC2080<-readRDS(file= 'tmp/BEC2080PS') %>%
   crop(AOI)
 saveRDS(BEC2080, file = 'tmp/BEC2080')
 writeRaster(BEC2080, filename=file.path(spatialOutDir,paste("BEC2080",sep="")), format="GTiff",overwrite=TRUE, RAT=TRUE)
+
+parks2017<-readRDS(file= 'tmp/parks2017') %>%
+  st_buffer(dist=0) %>%
+  st_intersection(AOI)
+saveRDS(parks2017, file = 'tmp/AOI/parks2017')
+
+HillShade <-raster(file.path(GISLibrary,'GRIDS/hillshade_BC.tif')) %>%
+  mask(AOI) %>%
+  crop(AOI)
+
+lakes<-readRDS(file= 'tmp/lakes') %>%
+  st_buffer(dist=0) %>%
+  st_intersection(AOI)
+saveRDS(lakes, file = 'tmp/AOI/lakes')
+
+rivers<-readRDS(file= 'tmp/rivers') %>%
+  st_buffer(dist=0) %>%
+  st_intersection(AOI)
+saveRDS(rivers, file = 'tmp/AOI/rivers')
+
+
 
 ####Other load stuff
 #if(!is.null(subzones)){
